@@ -10,6 +10,23 @@ permissions:
   contents: read
 
 jobs:
+  ko:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+      - uses: ko-build/setup-ko@v0.6
+      - name: Build and push
+        env:
+          KO_DOCKER_REPO: ${{ steps.login-ecr.outputs.registry}}/ko-example
+          IMAGE_TAG: ko-${{ github.sha }}
+        run: ko build --tags ${{ env.IMAGE_TAG }} --bare .
+
   dockerfile:
     runs-on: ubuntu-latest
     steps:
@@ -22,9 +39,8 @@ jobs:
         id: login-ecr
       - name: Build and push
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: "ko-example"
+          REPOSITORY: ${{ steps.login-ecr.outputs.registry }}/ko-example
           IMAGE_TAG: dockerfile-${{ github.sha }}
         run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }} -f Dockerfile .
-          docker push ${{ env.ECR_REGISTRY }}/${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker build -t ${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }} -f Dockerfile .
+          docker push ${{ env.REPOSITORY }}:${{ env.IMAGE_TAG }}
